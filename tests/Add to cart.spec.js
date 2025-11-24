@@ -1,100 +1,89 @@
 const { test, expect } = require("@playwright/test");
 
-test("Website for automation practice ", async ({ browser }) => {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  //Neviget page
+// Fast Login
+async function fastLogin(page) {
   await page.goto("https://automationexercise.com/login");
-  await expect(
-    page.locator("//*[@class='login-form']//h2", {
-      name: "Login to your account",
-    })
-  ).toBeVisible();
-
-  //Login page
   await page
-    .getByPlaceholder("Email Address")
+    .getByPlaceholder("email", { name: "email" })
     .first()
     .fill("neelgangani@codewiglet.com");
   await page.getByPlaceholder("Password").fill("Test@123");
   await page.getByRole("button", { name: "Login" }).click();
+  await page.waitForLoadState("domcontentloaded");
+}
 
-  //page load
-
-  await page.waitForLoadState("networkidle");
+// View product
+async function openProductByIndex(page) {
   await expect(
-    page.locator(
-      "//*[@class='features_items']//h2[@class='title text-center']",
-      {
-        name: "Features Items",
-      }
-    )
+    page.getByRole("heading", { name: "Features Items" })
   ).toBeVisible();
 
-  await page.locator("//*[@href='/product_details/2']").click();
+  await page.getByRole("link", { name: "View Product" }).nth(1).click();
+}
 
-  //Get Product Name
-  const product = page.locator("//*[@class='product-information']//h2");
-  const productText = await product.innerText();
+// Add to cart
+async function addToCart(page) {
+  const product = await page.getByRole("heading", { name: "Men Tshirt" });
+  const productText = await product.textContent();
   console.log(productText);
-
-  // Add to cart
   await page.getByRole("button", { name: "Add to cart" }).click();
 
-  await page.waitForSelector('//*[@class="modal-content"]');
+  await page.waitForSelector(".modal-content");
   await expect(
     page
-      .locator("//*[@class='text-center']", {
+      .locator(".text-center", {
         name: "Your product has been added to cart.",
       })
       .first()
   ).toBeVisible();
 
-  await page.locator("//*[@class='text-center']//a").click();
+  await page.getByRole("link", { name: "View Cart" }).click();
+}
 
-  //Address Details page
-
-  await page.locator("//*[@class='btn btn-default check_out']").click();
-
-  await page.locator(".form-control").pressSequentially(
-    // "You can provide information about where to leave the package if you won't be home, such as 'Please leave on the porch' or 'Call before delivery'",
-    "teste",
-    { delay: 100 }
-  );
-  await page.locator("//*[@class='btn btn-default check_out']").click();
-
-  //Payment Details page
-  await expect(
-    page.locator("//*[@class='step-one']//h2", {
-      name: "Payment",
-    })
-  ).toBeVisible();
-
-  // fill payment details
+//Checkout
+async function proceedCheckout(page) {
+  await page.locator(".btn-default.check_out").click();
 
   await page
-    .locator("//*[@name='name_on_card']")
-    .pressSequentially("Neel Gangani", { delay: 100 });
-  await page
-    .locator("//*[@name='card_number']")
-    .pressSequentially("1234 5662 1231", { delay: 100 });
+    .locator(".form-control")
+    .fill("Please leave on porch. Call if needed.");
+  await page.getByRole("link", { name: "Place Order" }).click();
+}
 
-  await page.locator("//*[@name='cvc']").fill("213");
-  await page.locator("//*[@name='expiry_month']").fill("10");
-  await page.locator("//*[@name='expiry_year']").fill("2025");
-
+// Fill Payment Details
+async function fillPayment(page) {
+  await page.locator("[data-qa='name-on-card']").fill("Neel");
+  await page.locator("[data-qa='card-number']").fill("1234 5662 1231");
+  await page.getByPlaceholder("ex. 311").fill("311");
+  await page.getByPlaceholder("MM").fill("10");
+  await page.getByPlaceholder("YYYY").fill("2026");
   await page.getByRole("button", { name: "Pay and Confirm Order" }).click();
+  await expect(page.locator(".alert-success")).toBeHidden();
 
-  const sucmsg = await page.locator(
-    "//*[@class='col-md-12 form-group hide']//div"
-  );
-  const sucmsghid = await expect(sucmsg).toBeHidden();
+  return await page
+    .getByText("Congratulations! Your order has been confirmed!")
+    .textContent();
+}
 
-  // Order Placed!
+// Login (1)
+test("View Product Page", async ({ page }) => {
+  await fastLogin(page);
+  await openProductByIndex(page);
+});
 
-  const confirmedmassage = await page
-    .locator("//*[@class='col-sm-9 col-sm-offset-1']//p")
-    .innerText();
+// Add to cart (2)
+test("Add Product to Cart", async ({ page }) => {
+  await fastLogin(page);
+  await openProductByIndex(page);
+  await addToCart(page);
+});
 
-  console.log(confirmedmassage);
+// Add Payment (3)
+test("Final Payment Fill", async ({ page }) => {
+  await fastLogin(page);
+  await openProductByIndex(page);
+  await addToCart(page);
+  await proceedCheckout(page);
+  const confirmationMsg = await fillPayment(page);
+  console.log("Order Confirmation:", confirmationMsg);
 });
